@@ -71,34 +71,34 @@ export default function SendPayment() {
     <div>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="destination">Destination Address</Label>
+          <Label htmlFor="destination">Employee Address</Label>
           <Input
             id="destination"
             value={destination}
             onChange={(e) => setDestination(e.target.value)}
-            placeholder="Enter XRPL address"
+            placeholder="Enter employee XRPL address"
           />
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="amount">Amount (RLUSD)</Label>
+          <Label htmlFor="amount">Payment Amount (RLUSD)</Label>
           <Input
             type="number"
             id="amount"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
-            placeholder="Enter amount"
+            placeholder="Enter payment amount"
             step="0.000001"
             min="0.000001"
           />
         </div>
 
-        <Card className="bg-slate-50 border-none">
+        <Card className="bg-white shadow-sm border-none">
           <CardContent className="pt-4">
-            <h3 className="text-sm font-medium text-gray-700 mb-2">Transaction Details</h3>
+            <h3 className="text-sm font-medium text-gray-700 mb-2">Payment Details</h3>
             <div className="space-y-1 text-sm">
               <div className="flex justify-between">
-                <span className="text-gray-600">Amount to send:</span>
+                <span className="text-gray-600">Payment amount:</span>
                 <span>{amount || "0"} RLUSD</span>
               </div>
               <div className="flex justify-between">
@@ -106,7 +106,7 @@ export default function SendPayment() {
                 <span>0.00001 RLUSD</span>
               </div>
               <div className="flex justify-between font-medium">
-                <span className="text-gray-700">Total cost:</span>
+                <span className="text-gray-700">Total payment:</span>
                 <span>{amount ? (Number(amount) + 0.00001).toFixed(6) : "0"} RLUSD</span>
               </div>
             </div>
@@ -123,21 +123,21 @@ export default function SendPayment() {
         {success && (
           <Alert className="bg-green-50 text-green-800 border-green-200">
             <CheckCircle2 className="h-4 w-4" />
-            <AlertDescription>Payment sent successfully!</AlertDescription>
+            <AlertDescription>Payment processed successfully!</AlertDescription>
           </Alert>
         )}
 
         {showQR && qrData && (
-          <div className="mt-4 p-4 border rounded-lg">
-            <h3 className="text-sm font-medium mb-2">Scan QR Code to Complete Payment</h3>
+          <div className="mt-4 p-4 border rounded-lg bg-white shadow-sm">
+            <h3 className="text-sm font-medium mb-2">Employee Payment QR Code</h3>
             <div className="flex justify-center">
               <QRCodeSVG value={qrData} size={200} />
             </div>
           </div>
         )}
 
-        <Button type="submit" disabled={isLoading} className="w-48 bg-[#008CFF] hover:bg-[#0070CC] rounded-lg cursor-pointer" style={{ padding: "1rem" }}>
-          {isLoading ? "Sending..." : "Send Payment"}
+        <Button type="submit" disabled={isLoading} className="w-48 bg-[#2E7D32] hover:bg-[#1B5E20] rounded-lg cursor-pointer" style={{ padding: "1rem" }}>
+          {isLoading ? "Processing Payment..." : "Process Payment"}
         </Button>
       </form>
     </div>

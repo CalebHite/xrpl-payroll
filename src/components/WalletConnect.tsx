@@ -180,31 +180,31 @@ export default function WalletConnect() {
       {showSecretKeyInput ? (
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="accountName">Account Name</Label>
+            <Label htmlFor="accountName">Employee Name</Label>
             <Input
               id="accountName"
               value={newAccountName}
               onChange={(e) => setNewAccountName(e.target.value)}
-              placeholder="Enter account name"
+              placeholder="Enter employee name"
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="secretKey">Secret Key</Label>
+            <Label htmlFor="secretKey">Employee Secret Key</Label>
             <Input
               type="password"
               id="secretKey"
               value={secretKey}
               onChange={(e) => setSecretKey(e.target.value)}
-              placeholder="Enter your secret key"
+              placeholder="Enter employee secret key"
             />
           </div>
           <div className="flex space-x-2">
             <Button
               onClick={handleConnectWithSecretKey}
               disabled={isLoading}
-              className="flex-1 bg-[#008CFF] hover:bg-[#0070CC]"
+              className="flex-1 bg-[#2E7D32] hover:bg-[#1B5E20]"
             >
-              {isLoading ? 'Importing...' : 'Import Account'}
+              {isLoading ? 'Adding Employee...' : 'Add Employee'}
             </Button>
             <Button
               variant="outline"
@@ -239,16 +239,16 @@ export default function WalletConnect() {
             className="w-full max-w-[300px]"
           >
             <Import className="mr-2 h-4 w-4 cursor-pointer" />
-            Import Account with Secret Key
+            Add Employee Account
           </Button>
         </div>
       ) : (
         <div className="space-y-6">
-          <Card className="border-none bg-slate-50">
+          <Card className="border-none bg-white shadow-sm">
             <CardContent className="pt-4">
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Current Account:</span>
+                  <span className="text-gray-600">Company Account:</span>
                   <div className="flex items-center gap-2">
                     <span className="font-mono text-sm truncate max-w-[200px]">{walletAddress}</span>
                     <Button
@@ -262,7 +262,7 @@ export default function WalletConnect() {
                   </div>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Balance:</span>
+                  <span className="text-gray-600">Company Balance:</span>
                   <span className="font-medium">
                     {!balance ? '0 RLUSD' : 
                       typeof balance === 'object' 
@@ -275,10 +275,10 @@ export default function WalletConnect() {
           </Card>
 
           <div>
-            <h3 className="text-lg font-medium mb-3">Your Accounts</h3>
+            <h3 className="text-lg font-medium mb-3">Employee Accounts</h3>
             <div className="space-y-2">
               {wallets.map((wallet) => (
-                <Card key={wallet.address} className="border-none bg-slate-50">
+                <Card key={wallet.address} className="border-none bg-white shadow-sm">
                   <CardContent className="p-3">
                     <div className="flex items-center justify-between">
                       <div className="overflow-hidden">
@@ -296,7 +296,7 @@ export default function WalletConnect() {
                         </div>
                         {showSecretKey === wallet.seed && (
                           <div className="mt-2 text-xs font-mono bg-slate-100 p-2 rounded overflow-x-auto">
-                            Secret Key: {wallet.seed}
+                            Employee Secret Key: {wallet.seed}
                           </div>
                         )}
                       </div>
@@ -306,7 +306,7 @@ export default function WalletConnect() {
                             variant="ghost" 
                             size="sm"
                             onClick={() => handleSwitchAccount(wallet.address)}
-                            className="text-[#008CFF]"
+                            className="text-[#2E7D32]"
                           >
                             <SwitchCamera className="h-4 w-4" />
                           </Button>
@@ -340,14 +340,14 @@ export default function WalletConnect() {
           <Separator />
 
           <div>
-            <h3 className="text-lg font-medium mb-3">Add New Account</h3>
+            <h3 className="text-lg font-medium mb-3">Add New Employee</h3>
             <Button
               variant="outline"
               onClick={handleImportClick}
               className="w-full max-w-[300px] cursor-pointer"
             >
               <Import className="mr-2 h-4 w-4" />
-              Import With Secret Key
+              Add Employee Account
             </Button>
           </div>
 
