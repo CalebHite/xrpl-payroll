@@ -1,12 +1,5 @@
-import WalletConnect from '@/components/WalletConnect';
-import SendPayment from '@/components/SendPayment';
+import { redirect } from "next/navigation"
 
-
-export default function Home(){
-  return (
-    <main>
-      <WalletConnect />
-      <SendPayment />
-    </main>
-  )
+export default function Home() {
+  redirect("/dashboard")
 }
