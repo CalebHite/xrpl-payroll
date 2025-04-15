@@ -19,7 +19,7 @@ type Wallet = {
 }
 
 export default function SendPayment() {
-  const { sendPaymentWithTrustlineHandling } = useXRPL()
+  const { sendPayment } = useXRPL()
   const [destination, setDestination] = useState("")
   const [amount, setAmount] = useState("")
   const [isLoading, setIsLoading] = useState(false)
@@ -77,10 +77,7 @@ export default function SendPayment() {
         throw new Error("Invalid XRPL address format. XRPL addresses start with 'r' and are 34 characters long.")
       }
 
-      const result = await sendPaymentWithTrustlineHandling(selectedEmployee, amount, {
-        autoSetupTrustlineForSender: true,
-        generateQRForRecipient: true,
-      })
+      const result = await sendPayment(selectedEmployee, amount)
 
       if (result.success) {
         setSuccess(true)

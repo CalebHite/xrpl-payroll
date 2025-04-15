@@ -1,49 +1,13 @@
-import { Client, Wallet, Payment, TrustSet } from 'xrpl';
+import { Client, Wallet, Payment } from 'xrpl';
 import { PinataService } from './pinata';
 
 const TESTNET_URL = 'wss://s.altnet.rippletest.net:51233';
 const WALLET_STORAGE_KEY = 'renmo_wallets';
 
-// rLUSD configuration
-const RLUSD_CURRENCY = 'USD';
-const RLUSD_ISSUER = 'rMxCKbEDwqr76QuheSUMdEGf4B9xJ8m5De'; // Testnet issuer
-
-interface TrustLine {
-  account: string;
-  balance: string;
-  currency: string;
-  limit: string;
-  limit_peer: string;
-  quality_in: number;
-  quality_out: number;
-}
-
 interface StoredWallet {
   seed: string;
   address: string;
   name?: string;
-}
-
-class TrustlineError extends Error {
-  type: string;
-  details: {
-    recipient: string;
-    currency: string;
-    issuer: string;
-    instructions: string;
-  };
-
-  constructor(message: string, details: {
-    recipient: string;
-    currency: string;
-    issuer: string;
-    instructions: string;
-  }) {
-    super(message);
-    this.name = 'TrustlineError';
-    this.type = 'TRUSTLINE_REQUIRED';
-    this.details = details;
-  }
 }
 
 export class XRPLService {
@@ -260,7 +224,7 @@ export class XRPLService {
         }
       }
       
-      await new Promise(resolve => setTimeout(resolve, 3000)); // Increased wait time to 3 seconds
+      await new Promise(resolve => setTimeout(resolve, 3000)); // Wait time of 3 seconds
     }
     
     throw new Error('Wallet funding timed out. Please try again in a few minutes.');
@@ -318,147 +282,7 @@ export class XRPLService {
     }
   }
 
-  // Enhanced version to provide more information
-  async checkTrustline(address: string): Promise<{exists: boolean, balance?: string, limit?: string}> {
-    try {
-      const response = await this.client.request({
-        command: 'account_lines',
-        account: address,
-        ledger_index: 'validated',
-      });
-
-      const trustline = response.result.lines.find(
-        (line: TrustLine) => line.currency === RLUSD_CURRENCY && line.account === RLUSD_ISSUER
-      );
-
-      if (trustline) {
-        return {
-          exists: true,
-          balance: trustline.balance,
-          limit: trustline.limit
-        };
-      }
-      return { exists: false };
-    } catch (error) {
-      // If account doesn't exist or has no trustlines
-      return { exists: false };
-    }
-  }
-
-  // New method that automatically handles recipient trustlines
-  async sendPaymentWithTrustlineHandling(destination: string, amount: string, options?: {
-    autoSetupTrustlineForSender?: boolean,
-    retryAsXRP?: boolean
-  }): Promise<{success: boolean, result?: any, error?: string}> {
-    if (!this.wallet) {
-      return { success: false, error: 'No wallet connected' };
-    }
-
-    if (!this.isConnected) {
-      try {
-        await this.connect();
-      } catch (error) {
-        return { success: false, error: 'Failed to connect to XRPL' };
-      }
-    }
-
-    const opts = {
-      autoSetupTrustlineForSender: false, // Default to false since we're using XRP
-      retryAsXRP: true, // Always true since we're using XRP
-      ...options
-    };
-
-    try {
-      // Send XRP payment directly
-      const result = await this.sendXRPPayment(destination, amount);
-      return { success: true, result };
-    } catch (error) {
-      return { 
-        success: false, 
-        error: `Payment failed: ${error instanceof Error ? error.message : 'Unknown error'}` 
-      };
-    }
-  }
-
-  // Original sendPayment method (kept for compatibility)
   async sendPayment(destination: string, amount: string): Promise<any> {
-    if (!this.wallet) {
-      throw new Error('No wallet connected');
-    }
-
-    if (!this.isConnected) {
-      await this.connect();
-    }
-
-    try {
-      // Ensure trustline is set up for sender
-      await this.setupTrustline();
-
-      // Check if recipient has trustline
-      const recipientTrustline = await this.checkTrustline(destination);
-      if (!recipientTrustline.exists) {
-        throw new Error('Recipient does not have a trustline for RLUSD. They need to set up a trustline first.');
-      }
-
-      // Create the rLUSD payment
-      const payment: Payment = {
-        TransactionType: 'Payment',
-        Account: this.wallet.address,
-        Amount: {
-          currency: RLUSD_CURRENCY,
-          issuer: RLUSD_ISSUER,
-          value: amount
-        },
-        Destination: destination,
-      };
-
-      // Get the current network fee
-      const feeResponse = await this.client.request({
-        command: 'fee'
-      });
-      const fee = feeResponse.result.drops.base_fee || '10'; // Default to 10 drops if not available
-      
-      const ledgerResponse = await this.client.request({
-        command: 'ledger_current',
-      });
-      const currentLedgerIndex = ledgerResponse.result.ledger_current_index;
-      
-      const prepared = await this.client.autofill(payment);
-      prepared.LastLedgerSequence = currentLedgerIndex + 20;
-      prepared.Fee = fee;
-
-      const signed = this.wallet.sign(prepared);
-      const result = await this.client.submitAndWait(signed.tx_blob);
-      
-      if (result.result.meta?.TransactionResult === 'tesSUCCESS') {
-        console.log('Payment successful');
-        return result;
-      } else if (result.result.meta?.TransactionResult === 'tecPATH_DRY') {
-        // If we get tecPATH_DRY, it means there's no liquidity path
-        // Let's verify both trustlines are properly set up
-        const senderTrustline = await this.checkTrustline(this.wallet.address);
-        const recipientTrustline = await this.checkTrustline(destination);
-
-        if (!senderTrustline.exists) {
-          throw new Error('Sender trustline is not properly set up');
-        }
-        if (!recipientTrustline.exists) {
-          throw new Error('Recipient trustline is not properly set up');
-        }
-
-        // If both trustlines exist but we still get tecPATH_DRY, it might be a liquidity issue
-        throw new Error('No liquidity path found. Please ensure both accounts have sufficient balance and proper trustlines.');
-      } else {
-        throw new Error(`Payment failed with code: ${result.result.meta?.TransactionResult}`);
-      }
-    } catch (error) {
-      console.error('Error sending payment:', error);
-      throw error;
-    }
-  }
-
-  // Add a method to send native XRP as fallback
-  async sendXRPPayment(destination: string, amount: string): Promise<any> {
     if (!this.wallet) {
       throw new Error('No wallet connected');
     }
@@ -515,136 +339,21 @@ export class XRPLService {
 
     try {
       // Get XRP balance
-      const xrpResponse = await this.client.request({
+      const response = await this.client.request({
         command: 'account_info',
         account: this.wallet.address,
         ledger_index: 'validated',
       });
       
-      const xrpBalance = (parseInt(xrpResponse.result.account_data.Balance) / 1000000).toString();
+      const xrpBalance = (parseInt(response.result.account_data.Balance) / 1000000).toString();
       
-      // Get issued currency balance
-      try {
-        const response = await this.client.request({
-          command: 'account_lines',
-          account: this.wallet.address,
-          ledger_index: 'validated',
-        });
-
-        // Find the rLUSD trustline
-        const rlusdLine = response.result.lines.find(
-          (line: TrustLine) => line.currency === RLUSD_CURRENCY && line.account === RLUSD_ISSUER
-        );
-
-        return {
-          xrp: xrpBalance,
-          rlusd: rlusdLine ? rlusdLine.balance : '0'
-        };
-      } catch (error) {
-        // If there's an error fetching trustlines, return just XRP balance
-        return {
-          xrp: xrpBalance,
-          rlusd: '0'
-        };
-      }
+      return {
+        xrp: xrpBalance
+      };
     } catch (error) {
       console.error('Error getting balance:', error);
       throw error;
     }
-  }
-
-  // Improved trustline setup with error handling and retries
-  async setupTrustline(customLimit?: string): Promise<any> {
-    if (!this.wallet) {
-      throw new Error('No wallet connected');
-    }
-
-    if (!this.isConnected) {
-      await this.connect();
-    }
-
-    // Check if trustline already exists
-    const trustlineStatus = await this.checkTrustline(this.wallet.address);
-    if (trustlineStatus.exists) {
-      console.log('Trustline already exists');
-      return { alreadyExists: true, status: 'success' };
-    }
-
-    try {
-      // First, configure account to allow rippling
-      const accountSet = {
-        TransactionType: 'AccountSet',
-        Account: this.wallet.address,
-        SetFlag: 8 // asfDefaultRipple
-      };
-
-      const preparedAccountSet = await this.client.autofill(accountSet);
-      const signedAccountSet = this.wallet.sign(preparedAccountSet);
-      await this.client.submitAndWait(signedAccountSet.tx_blob);
-
-      // Now set up the trustline
-      const trustSet: TrustSet = {
-        TransactionType: 'TrustSet',
-        Account: this.wallet.address,
-        LimitAmount: {
-          currency: RLUSD_CURRENCY,
-          issuer: RLUSD_ISSUER,
-          value: customLimit || '1000000000' // Set a high limit by default
-        }
-      };
-
-      const prepared = await this.client.autofill(trustSet);
-      const signed = this.wallet.sign(prepared);
-      const result = await this.client.submitAndWait(signed.tx_blob);
-      
-      if (result.result.meta?.TransactionResult === 'tesSUCCESS') {
-        console.log('Trustline setup successful');
-        return { status: 'success', result };
-      } else {
-        throw new Error(`Trustline setup failed with code: ${result.result.meta?.TransactionResult}`);
-      }
-    } catch (error) {
-      console.error('Error setting up trustline:', error);
-      throw error;
-    }
-  }
-
-  // New method to generate trustline setup instructions
-  generateTrustlineInstructions(recipientAddress: string): {
-    text: string,
-    qrData: string,
-    deepLink?: string
-  } {
-    const instructions = `
-To receive ${RLUSD_CURRENCY} payments, you need to set up a trustline:
-
-1. Log into your XRP Ledger wallet
-2. Navigate to the "Trust Lines" or "Assets" section
-3. Add a new trustline with these details:
-   - Currency Code: ${RLUSD_CURRENCY}
-   - Issuer Address: ${RLUSD_ISSUER}
-   - Limit: 1000000 (or your preferred amount)
-4. Submit the transaction and wait for confirmation
-
-Once the trustline is established, you'll be able to receive ${RLUSD_CURRENCY} at your address: ${recipientAddress}
-`;
-
-    const trustlineData = {
-      action: "setup_trustline",
-      currency: RLUSD_CURRENCY,
-      issuer: RLUSD_ISSUER,
-      recipient: recipientAddress,
-      limit: "1000000"
-    };
-
-    // In a real app, you might generate an actual deeplink for XUMM or other wallets
-    const deepLink = `xumm://xapp/trustline?currency=${RLUSD_CURRENCY}&issuer=${RLUSD_ISSUER}`;
-
-    return {
-      text: instructions,
-      qrData: JSON.stringify(trustlineData),
-      deepLink
-    };
   }
 
   // Helper method to check if address is valid
@@ -657,36 +366,6 @@ Once the trustline is established, you'll be able to receive ${RLUSD_CURRENCY} a
     }
   }
 
-  // New method to help recipient set up their wallet and trustline
-  async helpRecipientSetupWallet(recipientAddress: string): Promise<{
-    success: boolean,
-    message: string
-  }> {
-    try {
-      // Check if recipient already has a trustline
-      const trustlineStatus = await this.checkTrustline(recipientAddress);
-      if (trustlineStatus.exists) {
-        return {
-          success: true,
-          message: `Trustline already exists for address ${recipientAddress}`
-        };
-      }
-
-      // Set up trustline for this address
-      const trustlineResult = await this.setupTrustline();
-      
-      return {
-        success: true,
-        message: `Trustline established for address ${recipientAddress}`
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: `Failed to set up trustline: ${error instanceof Error ? error.message : 'Unknown error'}`
-      };
-    }
-  }
-
   getWalletAddress() {
     return this.wallet?.address || null;
   }
@@ -696,7 +375,6 @@ Once the trustline is established, you'll be able to receive ${RLUSD_CURRENCY} a
     return wallet?.seed || null;
   }
 
-  // Improved transaction history with better typing
   async getTransactionHistory(limit: number = 20) {
     if (!this.wallet) {
       throw new Error('No wallet connected');
@@ -743,25 +421,14 @@ Once the trustline is established, you'll be able to receive ${RLUSD_CURRENCY} a
         
         // For Payment transactions
         if (txType === 'Payment') {
-          // Check if it's a currency payment or XRP payment
-          const amountField = tx.tx_json.Amount || tx.tx_json.DeliverMax;
-          if (amountField && typeof amountField === 'object') {
-            amount = `${amountField.value} ${amountField.currency}`;
-            destination = tx.tx_json.Destination;
-          } else if (amountField) {
-            // XRP amount in drops, convert to XRP then to USD
+          const amountField = tx.tx_json.Amount;
+          if (amountField) {
+            // XRP amount in drops, convert to XRP
             const drops = parseInt(amountField);
             const xrp = drops / 1000000;
-            const usdValue = (xrp * 0.5).toFixed(2); // Using 0.5 as fixed XRP/USD rate
-            amount = `$${usdValue} USD`;
+            amount = `${xrp} XRP`;
             destination = tx.tx_json.Destination;
           }
-        }
-        
-        // For TrustSet transactions
-        if (txType === 'TrustSet' && tx.tx_json.LimitAmount) {
-          amount = `Trust limit: ${tx.tx_json.LimitAmount.value} ${tx.tx_json.LimitAmount.currency}`;
-          destination = tx.tx_json.LimitAmount.issuer;
         }
 
         const processedTx = {
