@@ -308,10 +308,10 @@ export default function WalletConnect() {
                     <span className="text-muted-foreground">Company Balance:</span>
                     <span className="font-medium">
                       {!balance
-                        ? "0 RLUSD"
+                        ? "0 XRP"
                         : typeof balance === "object"
-                          ? `${balance.xrp} RLUSD${balance.rlusd !== "0" ? `, ${balance.rlusd} RLUSD` : ""}`
-                          : `${balance} RLUSD`}
+                          ? `${balance.xrp} XRP`
+                          : `${balance} XRP`}
                     </span>
                   </div>
                 </div>
