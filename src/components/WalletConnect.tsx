@@ -12,6 +12,16 @@ import { Label } from "@/components/ui/label"
 import { Loader2, AlertCircle, Eye, EyeOff, Import, SwitchCamera, Trash2, Copy } from "lucide-react"
 import { Separator } from "@/components/ui/separator"
 import { useToast } from "@/components/ui/use-toast"
+import { PinataService } from "../lib/pinata"
+
+interface Wallet {
+  name: string;
+  address: string;
+  createdAt: string;
+  lastUsed: string;
+  tags?: string[];
+  seed?: string;
+}
 
 export default function WalletConnect() {
   const {
@@ -33,8 +43,8 @@ export default function WalletConnect() {
   const [showSecretKeyInput, setShowSecretKeyInput] = useState(false)
   const [showSecretKey, setShowSecretKey] = useState<string | null>(null)
   const { toast } = useToast()
-
-  const wallets = getWallets()
+  const pinataService = PinataService.getInstance()
+  const [wallets, setWallets] = useState<Wallet[]>([])
 
   useEffect(() => {
     console.log("WalletConnect component mounted")
@@ -52,6 +62,19 @@ export default function WalletConnect() {
 
     checkConnection()
   }, [isConnected, connect])
+
+  useEffect(() => {
+    const fetchAccounts = async () => {
+      try {
+        const accounts = await pinataService.getAllAccounts();
+        setWallets(accounts);
+      } catch (error) {
+        console.error('Error fetching accounts from Pinata:', error);
+      }
+    }
+
+    fetchAccounts()
+  }, [])
 
   const handleImportClick = (e: React.MouseEvent) => {
     e.preventDefault()
@@ -83,6 +106,20 @@ export default function WalletConnect() {
       console.log("Adding wallet with secret key...")
       await addWallet(newAccountName || undefined, secretKey)
       console.log("Wallet added successfully")
+      
+      if (walletAddress) {
+        // Upload employee data to Pinata
+        const employeeMetadata = {
+          name: newAccountName,
+          address: walletAddress,
+          createdAt: new Date().toISOString(),
+          lastUsed: new Date().toISOString(),
+        }
+        await pinataService.saveAccountMetadata(walletAddress, employeeMetadata)
+        console.log("Employee data uploaded to Pinata")
+      } else {
+        console.error("Failed to upload employee data: walletAddress is null")
+      }
 
       setSecretKey("")
       setNewAccountName("")
@@ -101,28 +138,6 @@ export default function WalletConnect() {
       } else {
         setError("Failed to connect with secret key")
       }
-      setStatus(null)
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const handleAddAccount = async () => {
-    try {
-      setIsLoading(true)
-      setError(null)
-      setStatus("Creating new account...")
-
-      if (!isConnected) {
-        await connect()
-      }
-
-      await addWallet(newAccountName || undefined)
-      setNewAccountName("")
-      setStatus(null)
-    } catch (error) {
-      console.error("Error adding account:", error)
-      setError(error instanceof Error ? error.message : "Failed to add account")
       setStatus(null)
     } finally {
       setIsLoading(false)
@@ -160,13 +175,6 @@ export default function WalletConnect() {
       setStatus(null)
     } finally {
       setIsLoading(false)
-    }
-  }
-
-  const handleShowSecretKey = (address: string) => {
-    const key = getSecretKey(address)
-    if (key) {
-      setShowSecretKey(showSecretKey === key ? null : key)
     }
   }
 
@@ -286,7 +294,7 @@ export default function WalletConnect() {
           <div>
             <h3 className="text-lg font-medium mb-3">Employee Accounts</h3>
             <div className="space-y-2">
-              {wallets.map((wallet) => (
+              {wallets.map((wallet: Wallet) => (
                 <Card key={wallet.address}>
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between">
@@ -303,31 +311,8 @@ export default function WalletConnect() {
                             <Copy className="h-4 w-4" />
                           </Button>
                         </div>
-                        {showSecretKey === wallet.seed && (
-                          <div className="mt-2 text-xs font-mono bg-muted p-2 rounded overflow-x-auto">
-                            Employee Secret Key: {wallet.seed}
-                          </div>
-                        )}
                       </div>
                       <div className="flex items-center gap-1">
-                        {wallet.address !== walletAddress && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleSwitchAccount(wallet.address)}
-                            className="text-[#2E7D32] h-8 w-8 p-0"
-                          >
-                            <SwitchCamera className="h-4 w-4" />
-                          </Button>
-                        )}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleShowSecretKey(wallet.address)}
-                          className="h-8 w-8 p-0"
-                        >
-                          {showSecretKey === wallet.seed ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </Button>
                         {wallets.length > 1 && (
                           <Button
                             variant="ghost"

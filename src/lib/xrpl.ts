@@ -134,6 +134,9 @@ export class XRPLService {
     if (secretKey) {
       try {
         newWallet = Wallet.fromSeed(secretKey);
+        if (!newWallet.address) {
+          throw new Error('Invalid wallet address generated from secret key');
+        }
         // Check if wallet already exists
         const existingWallet = this.wallets.find(w => w.address === newWallet.address);
         if (existingWallet) {
@@ -147,21 +150,30 @@ export class XRPLService {
       }
     } else {
       newWallet = Wallet.generate();
+      if (!newWallet.address || !newWallet.seed) {
+        throw new Error('Failed to generate a valid wallet address or seed');
+      }
     }
 
     const walletData: StoredWallet = {
-      seed: secretKey || newWallet.seed!,
-      address: newWallet.address,
+      seed: (secretKey || newWallet.seed) as string,
+      address: newWallet.address as string,
       name: name || `Account ${this.wallets.length + 1}`
     };
 
-    // Save metadata to Pinata
-    await this.pinataService.saveAccountMetadata(walletData.address, {
-      name: walletData.name,
-      address: walletData.address,
-      createdAt: new Date().toISOString(),
-      lastUsed: new Date().toISOString()
-    });
+    console.log('Saving wallet metadata to Pinata:', walletData);
+    try {
+      await this.pinataService.saveAccountMetadata(walletData.address, {
+        name: walletData.name,
+        address: walletData.address,
+        createdAt: new Date().toISOString(),
+        lastUsed: new Date().toISOString()
+      });
+      console.log('Wallet metadata saved to Pinata successfully');
+    } catch (error) {
+      console.error('Error saving wallet metadata to Pinata:', error);
+      throw error;
+    }
 
     this.wallets.push(walletData);
     this.saveWallets();
