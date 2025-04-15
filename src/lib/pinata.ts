@@ -36,20 +36,48 @@ export class PinataService {
 
   private async pinJSONToIPFS(json: any): Promise<string> {
     try {
-      // Updated to use the pinataApi instance
+      console.log('Attempting to pin JSON to IPFS:', {
+        endpoint: '/pinning/pinJSONToIPFS',
+        headers: this.pinataApi.defaults.headers,
+        data: json
+      });
+
       const response = await this.pinataApi.post(
         '/pinning/pinJSONToIPFS',
         json
       );
+      
+      console.log('Pinata API Response:', {
+        status: response.status,
+        statusText: response.statusText,
+        data: response.data
+      });
+
       return response.data.IpfsHash;
     } catch (error: any) {
-      console.error('Error pinning to IPFS:', error);
+      console.error('Error pinning to IPFS:', {
+        error: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        config: {
+          url: error.config?.url,
+          method: error.config?.method,
+          headers: error.config?.headers,
+          data: error.config?.data
+        }
+      });
       throw error;
     }
   }
 
   async saveAccountMetadata(address: string, metadata: AccountMetadata): Promise<void> {
     try {
+      console.log('Saving account metadata:', {
+        address,
+        metadata,
+        pinataJWT: PINATA_JWT ? 'JWT present' : 'JWT missing'
+      });
+
       // Ensure we're using the provided name, not the address
       const metadataToSave = {
         ...metadata,
@@ -60,7 +88,7 @@ export class PinataService {
       const metadataWithKeyvalues = {
         pinataContent: metadataToSave,
         pinataMetadata: {
-          name: `Account-${address}`,
+          name: metadata.name,
           keyvalues: {
             address: address,
             type: 'account'
@@ -68,8 +96,16 @@ export class PinataService {
         }
       };
       
+      console.log('Metadata to be saved:', metadataWithKeyvalues);
+      
       const ipfsHash = await this.pinJSONToIPFS(metadataWithKeyvalues);
       this.metadataCache[address] = metadataToSave;
+      
+      console.log('Successfully saved metadata:', {
+        address,
+        ipfsHash,
+        cacheSize: Object.keys(this.metadataCache).length
+      });
       
       // Store the IPFS hash in localStorage for quick access
       if (typeof window !== 'undefined') {
@@ -78,33 +114,55 @@ export class PinataService {
         localStorage.setItem('account_metadata_hashes', JSON.stringify(storedHashes));
       }
     } catch (error: any) {
-      console.error('Error saving account metadata:', error);
+      console.error('Error saving account metadata:', {
+        error: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        config: {
+          url: error.config?.url,
+          method: error.config?.method,
+          headers: error.config?.headers,
+          data: error.config?.data
+        }
+      });
       throw error;
     }
   }
 
   async fetchAllFromIPFS(unitFilter?: string) {
     try {
-      const response = await this.pinataApi.get('/data/pinList', {
-        params: {
-          status: 'pinned',
-          pageLimit: 1000,
-          metadata: unitFilter ? JSON.stringify({
-            keyvalues: {
-              unit: {
-                value: unitFilter,
-                op: 'eq'
-              }
+      const params = {
+        status: 'pinned',
+        pageLimit: 1000,
+        metadata: unitFilter ? JSON.stringify({
+          keyvalues: {
+            unit: {
+              value: unitFilter,
+              op: 'eq'
             }
-          }) : JSON.stringify({
-            keyvalues: {
-              type: {
-                value: 'account',
-                op: 'eq'
-              }
+          }
+        }) : JSON.stringify({
+          keyvalues: {
+            type: {
+              value: 'account',
+              op: 'eq'
             }
-          })
-        }
+          }
+        })
+      };
+
+      console.log('Fetching from IPFS:', {
+        endpoint: '/data/pinList',
+        params,
+        headers: this.pinataApi.defaults.headers
+      });
+
+      const response = await this.pinataApi.get('/data/pinList', { params });
+      
+      console.log('Pinata API Response:', {
+        status: response.status,
+        statusText: response.statusText,
+        dataCount: response.data.rows?.length
       });
       
       return {
@@ -112,7 +170,17 @@ export class PinataService {
         data: response.data.rows
       };
     } catch (error: any) {
-      console.error('Error fetching from IPFS:', error);
+      console.error('Error fetching from IPFS:', {
+        error: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        config: {
+          url: error.config?.url,
+          method: error.config?.method,
+          headers: error.config?.headers,
+          params: error.config?.params
+        }
+      });
       return {
         success: false,
         message: error.message
@@ -154,6 +222,8 @@ export class PinataService {
             }
           })
         );
+
+        console.log(accountsWithData)
         
         return accountsWithData;
       } else {
@@ -167,17 +237,80 @@ export class PinataService {
   
   async getAccountMetadataFromPin(ipfsHash: string): Promise<AccountMetadata> {
     try {
-      // Fetch the metadata using the IPFS hash
+      console.log('Fetching account metadata from pin:', {
+        ipfsHash,
+        endpoint: `/pinning/pinByHash/${ipfsHash}`,
+        headers: this.pinataApi.defaults.headers
+      });
+
       const response = await this.pinataApi.get(`/pinning/pinByHash/${ipfsHash}`);
+      
+      console.log('Pinata API Response:', {
+        status: response.status,
+        statusText: response.statusText,
+        hasData: !!response.data?.pinataContent
+      });
       
       if (response.data?.pinataContent) {
         return response.data.pinataContent;
       }
       
+      console.log('Falling back to gateway for metadata:', {
+        gatewayUrl: `https://gateway.pinata.cloud/ipfs/${ipfsHash}`
+      });
+
       const gatewayResponse = await axios.get(`https://gateway.pinata.cloud/ipfs/${ipfsHash}`);
       return gatewayResponse.data;
     } catch (error: any) {
-      console.error('Error fetching account metadata from pin:', error);
+      console.error('Error fetching account metadata from pin:', {
+        error: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        config: {
+          url: error.config?.url,
+          method: error.config?.method,
+          headers: error.config?.headers
+        }
+      });
+      throw error;
+    }
+  }
+
+  async removeAccount(address: string): Promise<void> {
+    try {
+      console.log('Removing wallet:', { address });
+
+      // First, get the IPFS hash from localStorage
+      if (typeof window !== 'undefined') {
+        const storedHashes = JSON.parse(localStorage.getItem('account_metadata_hashes') || '{}');
+        const ipfsHash = storedHashes[address];
+
+        if (ipfsHash) {
+          // Unpin from IPFS
+          await this.pinataApi.delete(`/pinning/unpin/${ipfsHash}`);
+          console.log('Successfully unpinned from IPFS:', { address, ipfsHash });
+
+          // Remove from localStorage
+          delete storedHashes[address];
+          localStorage.setItem('account_metadata_hashes', JSON.stringify(storedHashes));
+        }
+      }
+
+      // Remove from cache
+      delete this.metadataCache[address];
+
+      console.log('Successfully removed wallet:', { address });
+    } catch (error: any) {
+      console.error('Error removing wallet:', {
+        error: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        config: {
+          url: error.config?.url,
+          method: error.config?.method,
+          headers: error.config?.headers
+        }
+      });
       throw error;
     }
   }
