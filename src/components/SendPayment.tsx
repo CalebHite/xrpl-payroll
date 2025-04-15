@@ -10,6 +10,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { CheckCircle2, AlertCircle } from "lucide-react"
 import { QRCodeSVG } from "qrcode.react"
+import { PinataService } from "../lib/pinata"
 
 type Wallet = {
   address: string
@@ -18,7 +19,7 @@ type Wallet = {
 }
 
 export default function SendPayment() {
-  const { sendPaymentWithTrustlineHandling, walletAddress, getWallets } = useXRPL()
+  const { sendPaymentWithTrustlineHandling } = useXRPL()
   const [destination, setDestination] = useState("")
   const [amount, setAmount] = useState("")
   const [isLoading, setIsLoading] = useState(false)
@@ -29,14 +30,35 @@ export default function SendPayment() {
   const [wallets, setWallets] = useState<Wallet[]>([])
   const [selectedEmployee, setSelectedEmployee] = useState("")
 
-  useEffect(() => {
-    const fetchWallets = async () => {
-      const walletsList = getWallets()
-      setWallets(walletsList)
-    }
-    fetchWallets()
-  }, [getWallets])
+  const pinataService = PinataService.getInstance()
 
+  useEffect(() => {
+    const fetchAccounts = async () => {
+      try {
+        const pinataAccounts = await pinataService.getAllAccounts();
+        console.log("Fetched accounts:", pinataAccounts);
+        
+        // Transform the Pinata response to match our Wallet interface
+        const transformedWallets: Wallet[] = pinataAccounts.map((account: PinataResponse) => {
+          // Make sure we access the right properties based on the console output
+          return {
+            name: account.metadata?.name || "Unknown Employee",
+            address: account.metadata?.keyvalues?.address || "Unknown Address",
+            createdAt: account.metadata?.keyvalues?.createdAt || account.date_pinned,
+            lastUsed: account.metadata?.keyvalues?.lastUsed || account.date_pinned
+          };
+        });
+        
+        console.log("Transformed wallets:", transformedWallets);
+        setWallets(transformedWallets);
+      } catch (error) {
+        console.error('Error fetching accounts from Pinata:', error);
+      }
+    }
+
+    fetchAccounts()
+  }, [])
+  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
