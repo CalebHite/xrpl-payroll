@@ -9,7 +9,7 @@ export default function DashboardPage() {
   return (
     <div className="container mx-auto py-6 space-y-6 max-w-4xl">
       <div>
-        <h1 className="text-2xl font-bold mb-2">Payroll</h1>
+        <h1 className="text-4xl font-bold mb-2 pt-16">Dashboard</h1>
       </div>
 
       <Tabs defaultValue="accounts" className="w-full">

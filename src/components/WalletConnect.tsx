@@ -254,7 +254,7 @@ export default function WalletConnect() {
             <Button
               onClick={handleConnectWithSecretKey}
               disabled={isLoading}
-              className="flex-1 bg-emerald-400 hover:bg-emerald-500 cursor-pointer"
+              className="flex-1 bg-emerald-500 hover:bg-emerald-600 cursor-pointer"
             >
               {isLoading ? "Adding Employee..." : "Add Employee"}
             </Button>

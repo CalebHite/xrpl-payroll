@@ -183,7 +183,7 @@ export default function SendPayment() {
         <Button
           type="submit"
           disabled={isLoading}
-          className="w-48 bg-emerald-400 hover:bg-emerald-500 rounded-lg cursor-pointer"
+          className="w-48 bg-emerald-500 hover:bg-emerald-600 rounded-lg cursor-pointer"
           style={{ padding: "1rem" }}
         >
           {isLoading ? "Processing Payment..." : "Process Payment"}
