@@ -24,6 +24,7 @@ interface PinataResponse {
       address: string;
       createdAt: string;
       lastUsed: string;
+      type: string;
     };
   };
 }
@@ -77,13 +78,36 @@ export default function WalletConnect() {
         console.log("Fetched accounts:", pinataAccounts);
         
         // Transform the Pinata response to match our Wallet interface
-        const transformedWallets: Wallet[] = pinataAccounts.map((account: PinataResponse) => {
-          // Make sure we access the right properties based on the console output
+        const transformedWallets: Wallet[] = pinataAccounts.map((account: any) => {
+          // Access data based on the structure returned by Pinata
+          let name, address, createdAt, lastUsed;
+          
+          // Try to access data from different possible structures
+          if (account.metadata?.keyvalues) {
+            // Direct from pin list
+            name = account.metadata.name || "Unknown Employee";
+            address = account.metadata.keyvalues.address || "Unknown Address";
+            createdAt = account.metadata.keyvalues.createdAt || account.date_pinned;
+            lastUsed = account.metadata.keyvalues.lastUsed || account.date_pinned;
+          } else if (account.name) {
+            // Direct from account metadata
+            name = account.name;
+            address = account.address;
+            createdAt = account.createdAt;
+            lastUsed = account.lastUsed;
+          } else {
+            // Fallback
+            name = "Unknown Employee";
+            address = "Unknown Address";
+            createdAt = account.date_pinned || new Date().toISOString();
+            lastUsed = account.date_pinned || new Date().toISOString();
+          }
+          
           return {
-            name: account.metadata?.name || "Unknown Employee",
-            address: account.metadata?.keyvalues?.address || "Unknown Address",
-            createdAt: account.metadata?.keyvalues?.createdAt || account.date_pinned,
-            lastUsed: account.metadata?.keyvalues?.lastUsed || account.date_pinned
+            name,
+            address,
+            createdAt,
+            lastUsed
           };
         });
         
@@ -119,29 +143,51 @@ export default function WalletConnect() {
         await connect()
       }
 
-      await addWallet(newAccountName || undefined, secretKey)
+      // Capture the returned wallet
+      const newWallet = await addWallet(newAccountName || undefined, secretKey)
       
-      if (walletAddress) {
-        const employeeMetadata = {
-          name: newAccountName,
-          address: walletAddress,
-          createdAt: new Date().toISOString(),
-          lastUsed: new Date().toISOString(),
-        }
-        await pinataService.saveAccountMetadata(walletAddress, employeeMetadata)
-        
-        // Refresh the wallets list
-        const pinataAccounts = await pinataService.getAllAccounts();
-        const transformedWallets: Wallet[] = pinataAccounts.map((account: PinataResponse) => {
-          return {
-            name: account.metadata?.name || "Unknown Employee",
-            address: account.metadata?.keyvalues?.address || "Unknown Address",
-            createdAt: account.metadata?.keyvalues?.createdAt || account.date_pinned,
-            lastUsed: account.metadata?.keyvalues?.lastUsed || account.date_pinned
-          };
-        });
-        setWallets(transformedWallets);
+      if (!newWallet) {
+        throw new Error("Failed to add wallet")
       }
+      
+      // Use the address from the newly added wallet
+      const employeeMetadata = {
+        name: newAccountName || newWallet.name,
+        address: newWallet.address,
+        createdAt: new Date().toISOString(),
+        lastUsed: new Date().toISOString(),
+      }
+      
+      // Save to Pinata with the correct address
+      await pinataService.saveAccountMetadata(newWallet.address, employeeMetadata)
+      
+      // Refresh the wallets list
+      const pinataAccounts = await pinataService.getAllAccounts();
+      const transformedWallets: Wallet[] = pinataAccounts.map((account: any) => {
+        // Same transformation logic as in the useEffect
+        let name, address, createdAt, lastUsed;
+        
+        if (account.metadata?.keyvalues) {
+          name = account.metadata.name || "Unknown Employee";
+          address = account.metadata.keyvalues.address || "Unknown Address";
+          createdAt = account.metadata.keyvalues.createdAt || account.date_pinned;
+          lastUsed = account.metadata.keyvalues.lastUsed || account.date_pinned;
+        } else if (account.name) {
+          name = account.name;
+          address = account.address;
+          createdAt = account.createdAt;
+          lastUsed = account.lastUsed;
+        } else {
+          name = "Unknown Employee";
+          address = "Unknown Address";
+          createdAt = account.date_pinned || new Date().toISOString();
+          lastUsed = account.date_pinned || new Date().toISOString();
+        }
+        
+        return { name, address, createdAt, lastUsed };
+      });
+      
+      setWallets(transformedWallets);
 
       setSecretKey("")
       setNewAccountName("")
@@ -174,17 +220,8 @@ export default function WalletConnect() {
       removeWallet(address)
       await pinataService.removeAccount(address);
       
-      // Refresh the wallets list
-      const pinataAccounts = await pinataService.getAllAccounts();
-      const transformedWallets: Wallet[] = pinataAccounts.map((account: PinataResponse) => {
-        return {
-          name: account.metadata?.name || "Unknown Employee",
-          address: account.metadata?.keyvalues?.address || "Unknown Address",
-          createdAt: account.metadata?.keyvalues?.createdAt || account.date_pinned,
-          lastUsed: account.metadata?.keyvalues?.lastUsed || account.date_pinned
-        };
-      });
-      setWallets(transformedWallets);
+      // Update wallets list by filtering out the removed one
+      setWallets(prev => prev.filter(wallet => wallet.address !== address));
       
       setStatus(null)
       
