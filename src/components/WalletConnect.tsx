@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useXRPL } from "../hooks/useXRPL"
+import { useXRPLContext } from "../context/XRPLContext"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -44,7 +44,7 @@ export default function WalletConnect() {
     connect,
     addWallet,
     removeWallet,
-  } = useXRPL()
+  } = useXRPLContext()
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [status, setStatus] = useState<string | null>(null)
@@ -152,7 +152,7 @@ export default function WalletConnect() {
       
       // Use the address from the newly added wallet
       const employeeMetadata = {
-        name: newAccountName || newWallet.name,
+        name: newAccountName || newWallet.name || "Unknown Employee",
         address: newWallet.address,
         createdAt: new Date().toISOString(),
         lastUsed: new Date().toISOString(),

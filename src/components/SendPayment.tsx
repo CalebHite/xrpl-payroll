@@ -2,14 +2,13 @@
 
 import type React from "react"
 import { useState, useEffect } from "react"
-import { useXRPL } from "../hooks/useXRPL"
+import { useXRPLContext } from "../context/XRPLContext"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { CheckCircle2, AlertCircle } from "lucide-react"
-import { QRCodeSVG } from "qrcode.react"
 import { PinataService } from "../lib/pinata"
 
 type Wallet = {
@@ -18,8 +17,25 @@ type Wallet = {
   seed?: string
 }
 
+type PinataResponse = {
+  id: string;
+  ipfs_pin_hash: string;
+  size: number;
+  user_id: string;
+  date_pinned: string;
+  metadata: {
+    name: string;
+    keyvalues: {
+      address: string;
+      createdAt: string;
+      lastUsed: string;
+      type: string;
+    };
+  };
+};
+
 export default function SendPayment() {
-  const { sendPayment } = useXRPL()
+  const { sendPayment, connect, isConnected, walletAddress } = useXRPLContext()
   const [destination, setDestination] = useState("")
   const [amount, setAmount] = useState("")
   const [isLoading, setIsLoading] = useState(false)
@@ -33,6 +49,16 @@ export default function SendPayment() {
   const pinataService = PinataService.getInstance()
 
   useEffect(() => {
+    const ensureConnection = async () => {
+      if (!isConnected) {
+        try {
+          await connect();
+        } catch (error) {
+          setError("Failed to connect to XRP Ledger");
+          console.error("Connection error:", error);
+        }
+      }
+    };
     const fetchAccounts = async () => {
       try {
         const pinataAccounts = await pinataService.getAllAccounts();
@@ -57,7 +83,8 @@ export default function SendPayment() {
     }
 
     fetchAccounts()
-  }, [])
+    ensureConnection();
+  }, [connect, isConnected])
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -66,6 +93,18 @@ export default function SendPayment() {
     setShowQR(false)
     setQrData(null)
     setIsLoading(true)
+
+    if (!isConnected) {
+      try {
+        await connect();
+      } catch (err) {
+        throw new Error("Could not connect to XRP Ledger");
+      }
+    }
+
+    if (!walletAddress) {
+      throw new Error("No wallet selected. Please select or create a wallet first.");
+    }
 
     try {
       if (!selectedEmployee || !amount) {
@@ -84,10 +123,6 @@ export default function SendPayment() {
         setSelectedEmployee("")
         setAmount("")
       } else {
-        if (result.qrData) {
-          setQrData(result.qrData)
-          setShowQR(true)
-        }
         // Improve error message for account not found
         if (result.error?.includes("Account not found")) {
           throw new Error(
@@ -169,15 +204,6 @@ export default function SendPayment() {
             <CheckCircle2 className="h-4 w-4" />
             <AlertDescription>Payment processed successfully!</AlertDescription>
           </Alert>
-        )}
-
-        {showQR && qrData && (
-          <div className="mt-4 p-4 border rounded-lg bg-card">
-            <h3 className="text-sm font-medium mb-2">Employee Payment QR Code</h3>
-            <div className="flex justify-center bg-white p-4 rounded-lg">
-              <QRCodeSVG value={qrData} size={200} />
-            </div>
-          </div>
         )}
 
         <Button
