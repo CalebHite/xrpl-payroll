@@ -3,7 +3,7 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import WalletConnect from "@/components/WalletConnect"
 import SendPayment from "@/components/SendPayment"
-import { Wallet, SendHorizontal } from "lucide-react"
+import { Wallet, SendHorizontal, Users } from "lucide-react"
 import { XRPLProvider } from "../../context/XRPLContext"
 import AccountManagement from '@/components/AccountManagement'
 
@@ -18,16 +18,16 @@ export default function DashboardPage() {
         <Tabs defaultValue="accounts" className="w-full">
           <TabsList className="mb-4">
             <TabsTrigger value="accounts" className="flex items-center gap-2 cursor-pointer">
-              <Wallet className="h-4 w-4" />
+            <Users className="h-4 w-4" />
               <span>Employees</span>
             </TabsTrigger>
             <TabsTrigger value="payments" className="flex items-center gap-2 cursor-pointer">
               <SendHorizontal className="h-4 w-4" />
-              <span>Send Payment</span>
+              <span>Payments</span>
             </TabsTrigger>
             <TabsTrigger value="account-management" className="flex items-center gap-2 cursor-pointer">
               <Wallet className="h-4 w-4" />
-              <span>Account Management</span>
+              <span>Account</span>
             </TabsTrigger>
           </TabsList>
 
